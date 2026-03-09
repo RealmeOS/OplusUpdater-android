@@ -144,7 +144,7 @@ object UrlDecryptUtil {
             put("ts", System.currentTimeMillis().toString())
 
             // userId - oplus-ota
-            put("userId", "oplus-ota|16000015")
+            put("userId", "oplus-ota|16000023")
         }
     }
 
@@ -210,17 +210,14 @@ object UrlDecryptUtil {
             return context.getString(R.string.url_expired)
         }
 
-        val days = remaining / 86400
-        val hours = (remaining % 86400) / 3600
+        val hours = remaining / 3600
         val minutes = (remaining % 3600) / 60
         val seconds = remaining % 60
 
-        return buildString {
-            if (days > 0) append("${days}:")
-            if (hours > 0 || days > 0) append("${hours}:")
-            if (minutes > 0 || hours > 0 || days > 0) append("${minutes}:")
-            append("$seconds")
+        return if (hours > 0) {
+            String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
         }
     }
-
 }

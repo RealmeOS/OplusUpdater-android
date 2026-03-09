@@ -19,3 +19,6 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep shrinking/resource shrinking enabled for release builds, but do not rename symbols.
+-dontobfuscate

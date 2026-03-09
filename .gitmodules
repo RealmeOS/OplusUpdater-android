@@ -1,4 +1,0 @@
-[submodule "updater"]
-	path = updater
-	url = git@github.com:Liberations/OppoUpdater.git
-	branch = main
