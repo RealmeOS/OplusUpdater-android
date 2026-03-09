@@ -58,17 +58,10 @@ fun AboutInfoDialog(
                     summary = "${packageInfo.versionName}(${packageInfo.versionCode})"
                 )
                 SuperArrow(
-                    title = "Liberations Fork",
+                    title = "GitHub",
                     summary = "https://github.com/Liberations/OplusUpdater-android",
                     onClick = {
                         context.startUrl("https://github.com/Liberations/OplusUpdater-android")
-                    }
-                )
-                SuperArrow(
-                    title = "GitHub",
-                    summary = "https://github.com/houvven/OplusUpdater-android",
-                    onClick = {
-                        context.startUrl("https://github.com/houvven/OplusUpdater-android")
                     }
                 )
             }

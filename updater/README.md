@@ -1,0 +1,254 @@
+# Oppo/Oplus Updater Android Library (JAR) & CLI Tool
+
+English | [简体中文](#简体中文)
+
+A lightweight Android library and command-line tool to query OPlus/OPPO/realme official OTA update info using the same protocol as the stock updater app. 
+
+This library is a Kotlin re-implementation inspired by and based on the Go project Houvven/OplusUpdater — many thanks to the original author:
+- https://github.com/Houvven/OplusUpdater
+
+## Features
+- **Android Library**: Integrate as JAR into Android apps
+- **CLI Tool**: Standalone command-line interface for OTA queries
+- **Multi-region Support**: CN, EU, IN, SG, RU, TR, TH, GL regions
+- **Secure Protocol**: Same encryption as official OPPO updater
+
+## Requirements
+- Android Library: minSdk 26 (Android 8.0+)
+- CLI Tool: Java 8 or higher
+- Dependencies: Kotlin + OkHttp + kotlinx.serialization-json
+
+## Android Library Usage
+
+### Gradle setup
+
+**Option A: Include as a module (recommended)**
+1) In `settings.gradle.kts` of your app project:
+```kotlin
+include(":updater")
+```
+2) In your app module `build.gradle.kts`:
+```kotlin
+dependencies {
+    implementation(project(":updater"))
+}
+```
+
+**Option B: Use the library as JAR (for non-Android projects)**
+1) Put `updater.jar` under your project's libs directory
+2) Add the JAR to your classpath and include required dependencies:
+```kotlin
+dependencies {
+    implementation(files("libs/updater.jar"))
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+}
+```
+
+**Note**: For Android projects, we recommend using Option A (module inclusion) as it handles dependencies automatically.
+
+### API
+Package: `updater`
+
+- `object Updater`
+  - `fun getConfig(region: String, gray: Int): Config`
+  - `fun queryUpdate(args: QueryUpdateArgs): ResponseResult`
+- `data class QueryUpdateArgs`
+  - `otaVersion`, `region`, `model`, `nvCarrier`, `guid`, `proxy`, `gray`, `reqMode`
+- `class Config`
+  - `carrierID`, `host`, `language`, `publicKey`, `publicKeyVersion`, `version`
+- `object Regions`
+  - `CN, EU, IN, SG, RU, TR, TH, GL`
+- `class ResponseResult`
+  - `responseCode`, `errMsg`, `body: String?`, `decryptedBodyBytes: ByteArray`
+
+### Usage (Kotlin)
+```kotlin
+import updater.QueryUpdateArgs
+import updater.Regions
+import updater.Updater
+
+val args = QueryUpdateArgs(
+    otaVersion = "RMX3350_11.F.00_0000_000000000000",
+    region = Regions.CN,
+    model = "RMX3350",      // optional, auto-filled from otaVersion if blank
+    nvCarrier = "",         // optional, auto-filled by region config
+    guid = "",              // optional, defaults to 64x '0' if blank
+    gray = 0,                // CN gray server when 1
+    reqMode = "manual"      // or "client_auto", "server_auto", "taste"
+)
+
+val result = Updater.queryUpdate(args)
+if (result.responseCode == 200L) {
+    // result.decryptedBodyBytes is raw JSON bytes of the decrypted body
+    val jsonText = String(result.decryptedBodyBytes)
+    // parse with kotlinx.serialization or org.json as you like
+} else {
+    // 304 means no update; others indicate error
+}
+```
+
+## Command Line Usage
+
+The library also provides a standalone command-line interface (CLI) tool:
+
+### Building the CLI
+```bash
+# Build the JAR with all dependencies included:
+./gradlew fatJar
+# or for a smaller JAR without dependencies:
+./gradlew Jar
+```
+
+The built JAR files will be in `updater/build/libs/`:
+- `updater-all.jar` - Standalone executable with all dependencies
+- `updater.jar` - Library only (without dependencies)
+
+### Running the CLI
+```bash
+java -jar updater-all.jar --help
+
+# Query for updates
+java -jar updater-all.jar PLK110_11.A --model=PLK110 --region=CN
+java -jar updater-all.jar RMX3820_13.1.0.130_0130_202404010000 --model=RMX3820 --region=IN
+java -jar updater-all.jar A127_13.0_0001 --model=A127 --proxy=http://localhost:7890
+```
+
+### CLI Parameters
+```
+Usage: java -jar updater-all.jar [OTA_VERSION] [OPTIONS]
+
+Options:
+  -m, --model TEXT      Device model (required), e.g., RMX3820, CPH2401
+  -r, --region TEXT     Server region: CN (default), EU or IN
+  -c, --carrier TEXT    Carrier ID found in `my_manifest/build.prop` file under the `NV_ID` reference, e.g., 01000100
+  --mode INT            Mode: 0 (stable, default) or 1 (testing) [DEPRECATED]
+  -g, --guid TEXT       GUID, e.g., 1234567890(64 bit)
+  -p, --proxy TEXT      Proxy server, e.g., type://user:password@host:port
+  --gray INT            Gray update server: 0 (default) or 1 (use gray server for CN region)
+  --reqmode TEXT        Request Mode: manual (default), server_auto, client_auto or taste. Do not use taste mode together with gray update mode (--gray=1).
+  -h, --help            Show this help message
+```
+
+## Notes
+- `Updater.getConfig(region, gray)` returns carrier/language/host and public key used for `protectedKey` negotiation.
+- If `otaVersion` is missing suffix parts, the library appends a default ".01_0001_197001010000" for compatibility.
+- When `guid` is blank, a default 64-zeros deviceId is used.
+- You can set a proxy via `args.proxy` (e.g., `http://localhost:7890`).
+
+## License
+This library follows the license of this repository (see `LICENSE`).
+
+## Credits
+- Inspired by and re-implemented from the Go project: https://github.com/Houvven/OplusUpdater
+- Many thanks to the original author for the research and protocol details.
+
+---
+
+## 简体中文
+
+一个用于 Android 的轻量库和命令行工具，用官方协议查询 OPlus/OPPO/Realme 的系统更新信息
+
+本库为 Kotlin 版本的重写，参考并致谢原 Go 实现：
+- https://github.com/Houvven/OplusUpdater
+
+### 功能特性
+- **Android 库**: 可作为 JAR 集成到 Android 应用
+- **命令行工具**: 独立的 OTA 查询 CLI 工具
+- **多区域支持**: CN、EU、IN、SG、RU、TR、TH、GL 区域
+- **安全协议**: 与官方 OPPO 更新器相同的加密协议
+
+### 环境要求
+- Android 库: minSdk 26（Android 8.0 及以上）
+- CLI 工具: Java 8 或更高版本
+- 依赖: Kotlin、OkHttp、kotlinx.serialization-json
+
+### 集成方式
+**方式 A：作为模块引入（推荐）**
+1) 在项目根 `settings.gradle.kts`：
+```kotlin
+include(":updater")
+```
+2) 在应用 `build.gradle.kts`：
+```kotlin
+dependencies {
+    implementation(project(":updater"))
+}
+```
+
+**方式 B：使用 JAR 库（适用于非 Android 项目）**
+1) 将 `updater.jar` 放入您项目的 libs 目录
+2) 添加 JAR 到 classpath 并包含必要的依赖：
+```kotlin
+dependencies {
+    implementation(files("libs/updater.jar"))
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+}
+```
+
+**注意**：对于 Android 项目，我们推荐使用方式 A（模块引入），因为它会自动处理依赖关系。
+
+### API
+包名：`updater`
+- `Updater.getConfig(region, gray)`：获取地区配置（运营商、语言、host、公钥等）
+- `Updater.queryUpdate(args)`：发起查询，返回 `ResponseResult`
+- `QueryUpdateArgs`：查询参数（`otaVersion/region/model/nvCarrier/guid/proxy/gray/reqMode`）
+- `ResponseResult`：包含 `responseCode/errMsg/body/decryptedBodyBytes`
+- `Regions`：地区常量（`CN/EU/IN/SG/RU/TR/TH/GL`）
+
+### 使用示例（Kotlin）
+```kotlin
+import updater.QueryUpdateArgs
+import updater.Regions
+import updater.Updater
+
+val args = QueryUpdateArgs(
+    otaVersion = "RMX3350_11.F.00_0000_000000000000",
+    region = Regions.CN,
+    model = "RMX3350",
+    gray = 0,
+    reqMode = "manual"
+)
+val result = Updater.queryUpdate(args)
+if (result.responseCode == 200L) {
+    val bodyJson = String(result.decryptedBodyBytes)
+    // 使用你偏好的 JSON 库解析
+} else if (result.responseCode == 304L) {
+    // 没有可用更新
+} else {
+    // 其他错误，查看 errMsg
+}
+```
+
+### 命令行工具使用
+
+#### 构建 CLI
+```bash
+# 构建 JAR
+./gradlew :updater:fatJar
+# 或使用 Gradle Wrapper
+./gradlew Jar
+```
+
+构建的 JAR 文件位于 `updater/build/libs/`：
+- `updater-all.jar` - 包含所有依赖的可执行文件
+- `updater.jar` - 仅库文件（不含依赖）
+
+#### 运行 CLI
+```bash
+java -jar updater-all.jar --help
+
+# 查询更新
+java -jar updater-all.jar PLK110_11.A --model=PLK110 --region=CN
+java -jar updater-all.jar RMX3820_13.1.0.130_0130_202404010000 --model=RMX3820 --region=IN
+java -jar updater-all.jar A127_13.0_0001 --model=A127 --proxy=http://localhost:7890
+```
+
+### 说明
+- 若 `otaVersion` 缺少后缀，库会自动追加 `".01_0001_197001010000"` 以兼容。
+- `guid` 为空时将使用 64 个 `'0'` 的默认 deviceId。
+- 代理可通过 `args.proxy` 设置（如 `http://localhost:7890`）。
+
+### 许可
+遵循本仓库的 LICENSE（见 `LICENSE`）。
