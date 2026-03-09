@@ -104,7 +104,7 @@ fun HomeScreen() {
     var showAboutInfoDialog by remember { mutableStateOf(false) }
 
     var isQuerying by rememberSaveable { mutableStateOf(false) }
-    var expandMoreParameters by rememberSaveable { mutableStateOf(true) }
+    var expandMoreParameters by rememberSaveable { mutableStateOf(false) }
     var otaVersion by rememberSaveable { mutableStateOf(simpleSystemOtaVersion) }
     var model by rememberSaveable { mutableStateOf("") }
     var carrier by rememberSaveable { mutableStateOf("") }
