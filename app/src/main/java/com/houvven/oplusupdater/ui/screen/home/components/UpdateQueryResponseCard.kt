@@ -1,11 +1,17 @@
 package com.houvven.oplusupdater.ui.screen.home.components
 
 import android.content.ClipData
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,9 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.toClipEntry
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
 import com.houvven.oplusupdater.R
 import com.houvven.oplusupdater.domain.UpdateQueryResponse
 import com.houvven.oplusupdater.utils.StorageUnitUtil
@@ -26,17 +40,13 @@ import com.houvven.oplusupdater.utils.toast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import top.yukonga.miuix.kmp.basic.BasicComponentColors
-import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.extra.RightActionColors
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperArrowDefaults
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import updater.ResponseResult
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.compareTo
 
 @Composable
 fun UpdateQueryResponseCard(
@@ -47,14 +57,8 @@ fun UpdateQueryResponseCard(
 
     if (response.responseCode.toInt() != 200) {
         Card {
-            SuperArrowWrapper(
-                title = "status",
-                summary = response.responseCode.toString()
-            )
-            SuperArrowWrapper(
-                title = "message",
-                summary = response.errMsg
-            )
+            MiuixItem(title = "status", summary = response.responseCode.toString())
+            MiuixItem(title = "message", summary = response.errMsg)
         }
         return
     }
@@ -63,44 +67,43 @@ fun UpdateQueryResponseCard(
         val json = Json { ignoreUnknownKeys = true }
         json.decodeFromString<UpdateQueryResponse>(response.decryptedBodyBytes.decodeToString())
     }.onSuccess {
-        UpdateQueryResponseCardContent(
-            modifier = modifier,
-            response = it
-        )
+        UpdateQueryResponseCardContent(modifier = modifier, response = it)
     }.onFailure {
         it.message?.let(context::toast)
     }
 }
 
 @Composable
-private fun SuperArrowWrapper(
+private fun MiuixItem(
     title: String,
     modifier: Modifier = Modifier,
-    titleColor: BasicComponentColors = BasicComponentDefaults.titleColor(),
     summary: String? = null,
-    summaryColor: BasicComponentColors = BasicComponentDefaults.summaryColor(),
-    leftAction: @Composable (() -> Unit)? = null,
-    rightText: String? = null,
-    rightActionColor: RightActionColors = SuperArrowDefaults.rightActionColors(),
     onClick: (() -> Unit)? = null,
+    compact: Boolean = false
 ) {
-    val defaultActionColors = RightActionColors(
-        color = Color.Transparent,
-        disabledColor = Color.Transparent,
-    )
+    val hasLatin = title.any { it in 'A'..'Z' || it in 'a'..'z' }
 
-    if (!summary.isNullOrBlank()) {
-        SuperArrow(
-            title = title,
-            modifier = modifier,
-            titleColor = titleColor,
-            summary = summary,
-            summaryColor = summaryColor,
-            leftAction = leftAction,
-            rightText = rightText,
-            rightActionColor = if (onClick == null) defaultActionColors else rightActionColor,
-            onClick = onClick,
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .padding(horizontal = 16.dp, vertical = if (compact) 10.dp else 14.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = title,
+            fontSize = if (hasLatin) 15.5.sp else 16.sp,
+            fontWeight = if (hasLatin) FontWeight.Medium else FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurface
         )
+        if (!summary.isNullOrBlank()) {
+            Text(
+                text = summary,
+                fontSize = 14.sp,
+                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
     }
 }
 
@@ -112,60 +115,73 @@ private fun UpdateQueryResponseCardContent(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
+    
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
 
     var showUpdateLogDialog by remember { mutableStateOf(false) }
+
+    val copyAction: (String?) -> Unit = { text ->
+        if (!text.isNullOrBlank()) {
+            coroutineScope.launch {
+                clipboard.setClipEntry(ClipData.newPlainText(text, text).toClipEntry())
+            }
+            context.toast(R.string.copied)
+        }
+    }
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Card {
-            SuperArrowWrapper(
-                title = stringResource(R.string.version_type),
-                summary = "$versionTypeH5 ($status)"
-            )
-            SuperArrowWrapper(
-                title = stringResource(R.string.version_name),
-                summary = realVersionName ?: versionName
-            )
-            (realOtaVersion ?: otaVersion)?.let {
-                SuperArrowWrapper(
-                    title = stringResource(R.string.ota_version),
-                    summary = it
+            val typeSummary = when {
+                !versionTypeH5.isNullOrBlank() && !status.isNullOrBlank() -> "$versionTypeH5 ($status)"
+                !versionTypeH5.isNullOrBlank() -> versionTypeH5
+                !status.isNullOrBlank() -> "不显示 ($status)"
+                else -> null
+            }
+
+            typeSummary?.let {
+                MiuixItem(
+                    title = stringResource(R.string.version_type),
+                    summary = it,
+                    onClick = { copyAction(it) }
                 )
             }
-            SuperArrowWrapper(
-                title = stringResource(R.string.android_version),
-                summary = realAndroidVersion ?: androidVersion
-            )
-            SuperArrowWrapper(
-                title = stringResource(R.string.os_version),
-                summary = realOsVersion ?: colorOSVersion ?: osVersion
-            )
-            SuperArrowWrapper(
-                title = stringResource(R.string.security_patch),
-                summary = securityPatch ?: securityPatchVendor
-            )
-            SuperArrowWrapper(
-                title = stringResource(R.string.published_time),
-                summary = publishedTime?.let {
-                    SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
-                        .format(Date(it))
-                }
-            )
-            description?.panelUrl?.let {
-                SuperArrowWrapper(
+            
+            val vName = realVersionName ?: versionName
+            MiuixItem(title = stringResource(R.string.version_name), summary = vName, onClick = { copyAction(vName) })
+
+            (realOtaVersion ?: otaVersion)?.let { ota ->
+                MiuixItem(title = stringResource(R.string.ota_version), summary = ota, onClick = { copyAction(ota) })
+            }
+
+            val androidVer = realAndroidVersion ?: androidVersion
+            MiuixItem(title = stringResource(R.string.android_version), summary = androidVer, onClick = { copyAction(androidVer) })
+
+            val osVer = realOsVersion ?: colorOSVersion ?: osVersion
+            MiuixItem(title = stringResource(R.string.os_version), summary = osVer, onClick = { copyAction(osVer) })
+
+            val patch = (securityPatch ?: securityPatchVendor)?.takeIf { it.isNotBlank() }
+            patch?.let {
+                MiuixItem(title = stringResource(R.string.security_patch), summary = it, onClick = { copyAction(it) })
+            }
+
+            val time = publishedTime?.let { SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault()).format(Date(it)) }
+            time?.let {
+                MiuixItem(title = stringResource(R.string.published_time), summary = it, onClick = { copyAction(it) })
+            }
+
+            description?.panelUrl?.let { url ->
+                MiuixItem(
                     modifier = Modifier.combinedClickable(
                         onClick = { showUpdateLogDialog = true },
-                        onLongClick = {
-                            coroutineScope.launch {
-                                clipboard.setClipEntry(ClipData.newPlainText(it, it).toClipEntry())
-                            }
-                            context.toast(R.string.copied)
-                        }
+                        onLongClick = { copyAction(url) }
                     ),
                     title = stringResource(R.string.update_log),
-                    summary = it
+                    summary = url,
+                    onClick = null
                 )
             }
         }
@@ -179,85 +195,98 @@ private fun UpdateQueryResponseCardContent(
 
             LaunchedEffect(componentPackets.manualUrl) {
                 componentPackets.manualUrl?.let { url ->
-                    println("url to decrypt: $url")
                     if (url.contains("downloadCheck")) {
                         isEncryptedUrl = true
                         isDecrypting = true
-                        runCatching {
-                            UrlDecryptUtil.resolveUrl(url)
-                        }.onSuccess {
-                            decryptedUrl = it
-                        }.onFailure {
-                            decryptedUrl = url // 失败时使用原 URL
-                        }.also {
-                            isDecrypting = false
-                        }
+                        runCatching { UrlDecryptUtil.resolveUrl(url) }
+                            .onSuccess { decryptedUrl = it }
+                            .onFailure { decryptedUrl = url }
+                            .also { isDecrypting = false }
                     } else {
                         isEncryptedUrl = false
                         decryptedUrl = url
                     }
                 }
             }
+            
             Card {
                 val size = componentPackets.size?.toLongOrNull()?.let(StorageUnitUtil::formatSize)
+                
+                val pName = component.componentName
+                MiuixItem(title = stringResource(R.string.packet_name), summary = pName, onClick = { copyAction(pName) }, compact = true)
 
-                SuperArrowWrapper(
-                    title = stringResource(R.string.packet_name),
-                    summary = component.componentName,
-                    rightText = size
-                )
+                if (size != null) {
+                    MiuixItem(title = stringResource(R.string.packet_size), summary = size, onClick = { copyAction(size) }, compact = true)
+                }
 
-                // 倒计时更新（每秒刷新）
-                LaunchedEffect(decryptedUrl, isEncryptedUrl) {
+                LaunchedEffect(decryptedUrl, isEncryptedUrl, lifecycleState) {
                     if (!isEncryptedUrl) return@LaunchedEffect
-                    decryptedUrl?.let { url ->
-                        UrlDecryptUtil.extractExpiresTimestamp(url)?.let { timestamp ->
-                            while (true) {
-                                expiresTime = UrlDecryptUtil.formatRemainingTime(timestamp, context)
-                                delay(1000)
-                                if (timestamp - System.currentTimeMillis() / 1000 <= 0) break
+                    if (lifecycleState == Lifecycle.State.RESUMED) {
+                        decryptedUrl?.let { url ->
+                            UrlDecryptUtil.extractExpiresTimestamp(url)?.let { timestamp ->
+                                while (true) {
+                                    val remaining = timestamp - System.currentTimeMillis() / 1000
+                                    if (remaining > 0) {
+                                        expiresTime = UrlDecryptUtil.formatRemainingTime(timestamp, context)
+                                        delay(1000)
+                                    } else {
+                                        expiresTime = context.getString(R.string.url_expired)
+                                        break
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
                 val finalUrl = decryptedUrl ?: componentPackets.url
-                componentPackets.manualUrl?.let {
-                    SuperArrowWrapper(
-                        title = stringResource(R.string.packet_url),
-                        summary = when {
-                            isDecrypting -> context.getString(R.string.url_is_decrypting)
-                            isEncryptedUrl && expiresTime != null -> "$finalUrl\n⏱ ${
-                                context.getString(
-                                    R.string.validity_period
-                                )
-                            }: $expiresTime"
+                val expiredString = stringResource(R.string.url_expired)
+                val isExpired = expiresTime == expiredString
 
-                            else -> finalUrl
-                        },
-                        onClick = {
-                            if (!isDecrypting && !finalUrl.isNullOrEmpty()) {
-                                coroutineScope.launch {
-                                    clipboard.setClipEntry(
-                                        ClipData.newPlainText(finalUrl, finalUrl).toClipEntry()
-                                    )
+                componentPackets.manualUrl?.let {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { copyAction(finalUrl) }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        val summaryColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        val timerLabel = "⏱ ${context.getString(R.string.validity_period)}: $expiresTime"
+
+                        Text(
+                            text = stringResource(R.string.packet_url),
+                            fontSize = 15.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+
+                        BasicText(
+                            modifier = Modifier
+                                .padding(top = 2.dp),
+                            text = buildAnnotatedString {
+                                append(if (isDecrypting) context.getString(R.string.url_is_decrypting) else (finalUrl ?: ""))
+                                if (isEncryptedUrl && expiresTime != null) {
+                                    append("\n")
+                                    if (isExpired) {
+                                        withStyle(SpanStyle(color = Color(0xFFF44336))) {
+                                            append(timerLabel)
+                                        }
+                                    } else {
+                                        append(timerLabel)
+                                    }
                                 }
-                                context.toast(R.string.copied)
-                            }
-                        }
-                    )
+                            },
+                            style = TextStyle(
+                                color = summaryColor,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp
+                            )
+                        )
+                    }
                 }
-                componentPackets.md5?.let {
-                    SuperArrowWrapper(
-                        title = stringResource(R.string.packet_md5),
-                        summary = componentPackets.md5,
-                        onClick = {
-                            coroutineScope.launch {
-                                clipboard.setClipEntry(ClipData.newPlainText(it, it).toClipEntry())
-                            }
-                            context.toast(R.string.copied)
-                        }
-                    )
+                
+                componentPackets.md5?.let { md5Value ->
+                    MiuixItem(title = stringResource(R.string.packet_md5), summary = md5Value, onClick = { copyAction(md5Value) }, compact = true)
                 }
             }
         }

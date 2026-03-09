@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.houvven.oplusupdater.utils.startUrl
-import top.yukonga.miuix.kmp.extra.SuperArrow
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -49,26 +49,19 @@ fun AboutInfoDialog(
                     .clip(RoundedCornerShape(16.dp))
                     .background(MiuixTheme.colorScheme.surface)
             ) {
-                SuperArrow(
+                ArrowPreference(
                     title = "Author",
                     summary = "Houvven",
                 )
-                SuperArrow(
+                ArrowPreference(
                     title = "Version",
                     summary = "${packageInfo.versionName}(${packageInfo.versionCode})"
                 )
-                SuperArrow(
-                    title = "Liberations Fork",
+                ArrowPreference(
+                    title = "GitHub",
                     summary = "https://github.com/Liberations/OplusUpdater-android",
                     onClick = {
                         context.startUrl("https://github.com/Liberations/OplusUpdater-android")
-                    }
-                )
-                SuperArrow(
-                    title = "GitHub",
-                    summary = "https://github.com/houvven/OplusUpdater-android",
-                    onClick = {
-                        context.startUrl("https://github.com/houvven/OplusUpdater-android")
                     }
                 )
             }

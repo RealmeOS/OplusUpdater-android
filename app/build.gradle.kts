@@ -1,39 +1,19 @@
-import com.android.build.gradle.internal.api.BaseVariantOutputImpl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization") version libs.versions.kotlin
 }
 
 android {
     namespace = "com.houvven.oplusupdater"
-    compileSdk = 36
-
-    val keystorePropertiesFile = rootProject.file("local.properties")
-    val keystoreProperties = Properties()
-    if (keystorePropertiesFile.exists()) {
-        keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
-    }
-    signingConfigs {
-        create("release") {
-            storeFile = file(keystoreProperties["keystore.jks"] as String? ?: "keystore.jks")
-            storePassword = keystoreProperties["SIGNING_STORE_PASSWORD"] as String?
-                ?: System.getenv("SIGNING_STORE_PASSWORD")
-            keyAlias = keystoreProperties["SIGNING_KEY_ALIAS"] as String?
-                ?: System.getenv("SIGNING_KEY_ALIAS")
-            keyPassword = keystoreProperties["SIGNING_KEY_PASSWORD"] as String?
-                ?: System.getenv("SIGNING_KEY_PASSWORD")
-        }
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.houvven.oplusupdater"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "2.0.0"
 
@@ -72,8 +52,6 @@ android {
             this.outputFileName = "OppoUpdater-${versionName}.${name}.apk"
         }
     }
-
-
 }
 
 kotlin {
@@ -95,7 +73,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material.icons.extended)
-    implementation(libs.miuix)
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.preference)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

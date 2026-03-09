@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -55,7 +56,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperDropdown
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import updater.ResponseResult
 import updater.Updater
@@ -104,7 +105,7 @@ fun HomeScreen() {
     var showAboutInfoDialog by remember { mutableStateOf(false) }
 
     var isQuerying by rememberSaveable { mutableStateOf(false) }
-    var expandMoreParameters by rememberSaveable { mutableStateOf(true) }
+    var expandMoreParameters by rememberSaveable { mutableStateOf(false) }
     var otaVersion by rememberSaveable { mutableStateOf(simpleSystemOtaVersion) }
     var model by rememberSaveable { mutableStateOf("") }
     var carrier by rememberSaveable { mutableStateOf("") }
@@ -237,7 +238,7 @@ fun HomeScreen() {
                     .clip(RoundedCornerShape(12.dp))
                     .background(MiuixTheme.colorScheme.surface)
             ) {
-                SuperDropdown(
+                OverlayDropdownPreference(
                     title = stringResource(R.string.region),
                     items = OtaRegion.entries.map { stringResource(it.strRes) },
                     selectedIndex = OtaRegion.entries.indexOf(otaRegion)
@@ -245,7 +246,7 @@ fun HomeScreen() {
                     otaRegion = OtaRegion.entries[it]
                 }
 
-                SuperDropdown(
+                OverlayDropdownPreference(
                     title = stringResource(R.string.mode),
                     items = QueryMode.entries.map { stringResource(it.strRes) },
                     selectedIndex = QueryMode.entries.indexOf(reqMode)
@@ -265,8 +266,8 @@ fun HomeScreen() {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Checkbox(
-                        checked = gray,
-                        onCheckedChange = { gray = it }
+                        state = ToggleableState(gray),
+                        onClick = { gray = !gray }
                     )
                     
                     Text(
