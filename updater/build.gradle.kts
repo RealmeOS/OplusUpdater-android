@@ -4,7 +4,7 @@ plugins {
     id("java-library")
     id("org.jetbrains.kotlin.jvm")
     kotlin("plugin.serialization")
-    id("com.gradleup.shadow") version "9.2.2"
+    id("com.gradleup.shadow") version "9.4.1"
 }
 
 java {
