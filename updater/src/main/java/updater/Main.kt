@@ -7,40 +7,27 @@ fun main(args: Array<String>) {
     try {
         val parsedArgs = parseArgs(args)
         val result = Updater.queryUpdate(parsedArgs)
-        
-        // 显示响应状态
+
         println("Response Code: ${result.responseCode}")
         if (result.errMsg.isNotBlank()) {
             println("Error Message: ${result.errMsg}")
         }
-        
-        // 即使响应码不为0也显示响应体，因为可能包含有用的信息
-        
-        // 然后显示响应体内容
-        try {
-            val jsonString = if (result.decryptedBodyBytes.isNotEmpty()) {
-                String(result.decryptedBodyBytes, Charsets.UTF_8)
-            } else if (result.body != null) {
-                result.body!!
-            } else {
-                null
-            }
-            
-            if (jsonString != null) {
-                val json = Json.parseToJsonElement(jsonString)
-                println("\nResponse Body:")
-                println(Json { prettyPrint = true }.encodeToString(json))
-            } else {
-                println("\nNo response body received")
-            }
-        } catch (e: Exception) {
-            println("\nFailed to parse response body:")
-            if (result.decryptedBodyBytes.isNotEmpty()) {
-                println(String(result.decryptedBodyBytes, Charsets.UTF_8))
-            } else if (result.body != null) {
-                println(result.body)
-            }
+
+        val jsonString = when {
+            result.decryptedBodyBytes.isNotEmpty() -> String(result.decryptedBodyBytes, Charsets.UTF_8)
+            !result.body.isNullOrBlank() -> result.body
+            else -> null
         }
+
+        if (jsonString == null) {
+            println("\nNo response body received")
+            return
+        }
+
+        println("\nResponse Body:")
+        runCatching {
+            Json { prettyPrint = true }.encodeToString(Json.parseToJsonElement(jsonString))
+        }.onSuccess { println(it) }.onFailure { println(jsonString) }
     } catch (e: Exception) {
         System.err.println("Error: ${e.message}")
         exitProcess(1)
@@ -52,143 +39,77 @@ fun parseArgs(args: Array<String>): QueryUpdateArgs {
         printUsage()
         exitProcess(0)
     }
-    
-    var otaVersion = args[0]
-    var model = ""
-    var region = "CN"
-    var nvCarrier = ""
-    var guid = ""
-    var proxy = ""
-    var gray = 0
-    var reqMode = "manual"
-    
+
+    val parsed = QueryUpdateArgs(otaVersion = args[0])
     var i = 1
     while (i < args.size) {
         val arg = args[i]
-        
-        // 处理 --key=value 格式的参数
-        if (arg.contains("=")) {
-            val parts = arg.split("=", limit = 2)
-            val key = parts[0]
-            val value = parts[1]
-            
-            when (key) {
-                "--model", "-m" -> model = value
-                "--region", "-r" -> region = value
-                "--carrier", "-c" -> nvCarrier = value
-                "--guid", "-g" -> guid = value
-                "--proxy", "-p" -> proxy = value
-                "--gray" -> gray = value.toIntOrNull() ?: 0
-                "--reqmode" -> reqMode = value
-                "--mode" -> {} // 忽略mode参数
-                else -> {
-                    System.err.println("Unknown option: $key")
-                    printUsage()
-                    exitProcess(1)
-                }
+        val inline = arg.contains("=")
+        val key = if (inline) arg.substringBefore("=") else arg
+        val value = if (inline) arg.substringAfter("=", "") else null
+
+        fun take(): String {
+            if (inline) return value!!
+            if (i + 1 >= args.size) {
+                System.err.println("Error: Missing value for $key")
+                exitProcess(1)
             }
-            i += 1
-        } else {
-            // 处理 --key value 格式的参数
-            when (arg) {
-                "--model", "-m" -> {
-                    model = getNextArg(args, i, "model")
-                    i += 2
-                }
-                "--region", "-r" -> {
-                    region = getNextArg(args, i, "region")
-                    i += 2
-                }
-                "--carrier", "-c" -> {
-                    nvCarrier = getNextArg(args, i, "carrier")
-                    i += 2
-                }
-                "--mode" -> {
-                    // mode参数不再使用，为了兼容性保留
-                    getNextIntArg(args, i, "mode")
-                    i += 2
-                }
-                "--guid", "-g" -> {
-                    guid = getNextArg(args, i, "guid")
-                    i += 2
-                }
-                "--proxy", "-p" -> {
-                    proxy = getNextArg(args, i, "proxy")
-                    i += 2
-                }
-                "--gray" -> {
-                    gray = getNextIntArg(args, i, "gray")
-                    i += 2
-                }
-                "--reqmode" -> {
-                    reqMode = getNextArg(args, i, "reqmode")
-                    i += 2
-                }
-                "--help", "-h" -> {
-                    printUsage()
-                    exitProcess(0)
-                }
-                else -> {
-                    System.err.println("Unknown option: $arg")
-                    printUsage()
-                    exitProcess(1)
-                }
+            return args[i + 1]
+        }
+
+        when (key) {
+            "--model", "-m" -> parsed.model = take()
+            "--region", "-r" -> parsed.region = take()
+            "--carrier", "-c" -> parsed.nvCarrier = take()
+            "--guid", "-g", "--device-id" -> parsed.deviceId = take()
+            "--proxy", "-p" -> parsed.proxy = take()
+            "--reqmode" -> parsed.reqMode = take()
+            "--help", "-h" -> {
+                printUsage()
+                exitProcess(0)
+            }
+            else -> {
+                System.err.println("Unknown option: $key")
+                printUsage()
+                exitProcess(1)
             }
         }
+        i += if (inline) 1 else 2
     }
-    
-    return QueryUpdateArgs(
-        otaVersion = otaVersion,
-        region = region,
-        model = model,
-        nvCarrier = nvCarrier,
-        guid = guid,
-        proxy = proxy,
-        gray = gray,
-        reqMode = reqMode
-    )
-}
-
-private fun getNextArg(args: Array<String>, index: Int, flagName: String): String {
-    if (index + 1 >= args.size) {
-        System.err.println("Error: Missing value for $flagName")
-        exitProcess(1)
-    }
-    return args[index + 1]
-}
-
-private fun getNextIntArg(args: Array<String>, index: Int, flagName: String): Int {
-    val value = getNextArg(args, index, flagName)
-    return try {
-        value.toInt()
-    } catch (e: NumberFormatException) {
-        System.err.println("Error: $flagName must be an integer")
-        exitProcess(1)
-    }
+    return parsed
 }
 
 private fun printUsage() {
-    println("""
-        Usage: java -har updater-all.jar [OTA_VERSION] [OPTIONS]
-        
-        Query OPlus, OPPO and Realme Mobile OS version updates using official API
-        
+    println(
+        """
+        Usage: java -jar updater-all.jar [OTA_VERSION] [OPTIONS]
+
+        Query OPlus, OPPO and realme Mobile OS updates through the official /update/v6 API.
+
         Options:
-          -m, --model TEXT      Device model (required), e.g., RMX3820, CPH2401
-          -r, --region TEXT     Server region: CN (default), EU or IN
-          -c, --carrier TEXT    Carrier ID found in `my_manifest/build.prop` file under the `NV_ID` reference, e.g., 01000100
-          --mode INT            Mode: 0 (stable, default) or 1 (testing) [DEPRECATED]
-          -g, --guid TEXT       GUID, e.g., 1234567890(64 bit)
-          -p, --proxy TEXT      Proxy server, e.g., type://user:password@host:port
-          --gray INT            Gray update server: 0 (default) or 1 (use gray server for CN region)
-          --reqmode TEXT        Request Mode: manual (default), server_auto, client_auto or taste. With CN + taste + gray, updater will first query taste then retry on gray server.
-          -h, --help            Show this help message
-        
+          -m, --model TEXT         Device model, e.g. PLK110 (default: prefix of OTA_VERSION)
+          -r, --region TEXT        Server region: CN (default), EU, IN, SG, RU, TR, TH, GL
+          -c, --carrier TEXT       nvCarrier, e.g. 10010111 (default: from region)
+          -g, --device-id TEXT     64 hex char device id (default: 64 zeros)
+          -p, --proxy TEXT         HTTP proxy, e.g. http://127.0.0.1:7890
+              --reqmode TEXT       Channel: manual (default), client_auto, server_auto, taste
+          -h, --help               Show this help message
+
+        Notes:
+          * OTA_VERSION must be the full prefix of the model you want to query, e.g. PLK110_11.A.
+            The branch letter (A / C / F / H / J) selects the OS generation: the newest one is
+            usually only served on the "taste" channel, older ones on "manual".
+          * Only OTA_VERSION and its model prefix describe the target. The local device's
+            romVersion / prjNum / marketName / brand / osType are never sent, so any model can be
+            queried from any device.
+          * responseCode 200 = update available, 2004 = none for that model/channel,
+            304 = rejected by the server (e.g. "security patch has problem").
+
         Examples:
-          java -jar updater-all.jar PLK110_11.A --model=PLK110 --carrier=10010111 --region=CN
-          java -jar updater-all.jar RMX3820_13.1.0.130_0130_202404010000 --model=RMX3820 --region=IN --mode=1
-          java -jar updater-all.jar A127_13.0_0001 --model=A127 --carrier=00000000 --proxy=http://localhost:7890
-          java -jar updater-all.jar OPD2413_11.A --model=OPD2413 --region=CN --gray=1
-          java -jar updater-all.jar PJX110_11.C --region=CN --reqmode=taste
-    """.trimIndent())
+          java -jar updater-all.jar PLK110_11.A -m PLK110
+          java -jar updater-all.jar RMX5010_11.H --reqmode taste
+          java -jar updater-all.jar RMX5010_11.F --region CN
+          java -jar updater-all.jar CPH2573_11.F.43_2430_202603192142 --region IN
+        """.trimIndent()
+    )
 }
